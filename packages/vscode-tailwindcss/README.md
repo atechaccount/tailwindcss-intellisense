@@ -18,6 +18,8 @@ In order for the extension to activate you must have [`tailwindcss` installed](h
 
 Intelligent suggestions for class names, as well as [CSS functions and directives](https://tailwindcss.com/docs/functions-and-directives/).
 
+Optional [reverse lookup](#tailwindcssexperimentalreverselookup) lets you search for classes using CSS declarations such as `width:40px`.
+
 <img src="https://raw.githubusercontent.com/tailwindlabs/tailwindcss-intellisense/main/packages/vscode-tailwindcss/.github/autocomplete.png" alt="" />
 
 ### Linting
@@ -205,6 +207,36 @@ Enable the Node.js inspector agent for the language server and listen on the spe
 ## Experimental Extension Settings
 
 **_Experimental settings may be changed or removed at any time._**
+
+### `tailwindCSS.experimental.reverseLookup`
+
+Suggest Tailwind utilities by typing CSS instead of remembering class names. **Default: `false`**. Requires Tailwind CSS v3 or v4 and `tailwindCSS.suggestions` to be enabled.
+
+Enable **Tailwind CSS › Experimental: Reverse Lookup** in VS Code's User or Workspace Settings, or add:
+
+```json
+{
+  "tailwindCSS.experimental.reverseLookup": true
+}
+```
+
+Type a single property/value query inside a class list, then accept a suggestion to replace the query with a Tailwind class. If the suggestion menu does not appear automatically, run VS Code's **Trigger Suggest** command (see also the recommended `editor.quickSuggestions` setting above):
+
+| Query                                      | Suggested class (default theme)         |
+| ------------------------------------------ | --------------------------------------- |
+| `width:40px`, `width: 40px`, or `width 40` | `w-10`                                  |
+| `padding:16px`                             | `p-4`                                   |
+| `display:flex`                             | `flex`                                  |
+| `hover:width:40px`                         | `hover:w-10`                            |
+| `width:41px`                               | `w-[41px]` when there is no named match |
+
+**Bare numbers for length properties mean pixels**, not Tailwind spacing steps. For example, `width 40` means 40px, while `w-40` normally means 160px. Pixel/rem matching uses `tailwindCSS.rootFontSize` (16 by default); the examples above assume that default. Unitless properties such as `opacity` and `line-height` retain their normal CSS meaning.
+
+Suggestions show the equivalent CSS and use your project's theme, prefix, and blocklist. Type just a property and colon (for example, `width:`) to browse up to 50 suggestions, or continue typing a value to narrow the search. Named matches are preferred; for supported values without a named match, the extension tries an arbitrary-value utility. Existing CSS previews are available in the suggestion details.
+
+Reverse lookup works in configured class attributes (`class`, `className`, etc.), class functions and tagged templates, custom `classRegex` matches, and `@apply` lists. Ordinary class and variant completions remain unchanged. No reverse-lookup compilation or index building runs while the setting is disabled.
+
+The initial scope is **single, same-line CSS values** for common properties: dimensions, physical margin/padding and offsets, gaps, border radius, basic typography, colors, opacity, and common layout keywords. Keywords can be completed from a prefix such as `display:fl`; numeric values match exactly rather than approximately. Multi-value shorthands, whole CSS blocks, inline `style` conversion, Emmet queries, and arbitrary plugin class names outside the supported utility families are not covered. Utilities that set additional CSS properties are not treated as exact matches (for example, `text-base` also sets `line-height`). Not every CSS property or value has a supported match.
 
 ### `tailwindCSS.experimental.configFile`
 

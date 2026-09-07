@@ -2,7 +2,7 @@
 
 ## Prerelease
 
-- Nothing yet!
+- Add opt-in CSS-to-Tailwind class suggestions with `tailwindCSS.experimental.reverseLookup` (Tailwind CSS v3 and v4).
 
 ## 0.16.0
 

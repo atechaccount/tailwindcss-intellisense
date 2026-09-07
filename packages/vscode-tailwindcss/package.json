@@ -338,6 +338,12 @@
           "markdownDescription": "Indicate when utilities may be written in a more optimal form",
           "scope": "language-overridable"
         },
+        "tailwindCSS.experimental.reverseLookup": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Suggest Tailwind utilities when typing CSS declarations such as `width:40px` or `display:flex` in class lists (Tailwind CSS v3 and v4). Bare length values, for example `width 40`, are interpreted as pixels. Uses `#tailwindCSS.rootFontSize#` for rem equivalents. Requires `#tailwindCSS.suggestions#`.",
+          "scope": "language-overridable"
+        },
         "tailwindCSS.experimental.classRegex": {
           "type": "array",
           "scope": "language-overridable"
