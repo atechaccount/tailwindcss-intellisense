@@ -340,8 +340,8 @@
         },
         "tailwindCSS.experimental.reverseLookup": {
           "type": "boolean",
-          "default": false,
-          "markdownDescription": "Suggest Tailwind utilities when typing CSS declarations such as `width:40px` or `display:flex` in class lists (Tailwind CSS v3 and v4). Bare length values, for example `width 40`, are interpreted as pixels. Uses `#tailwindCSS.rootFontSize#` for rem equivalents. Requires `#tailwindCSS.suggestions#`.",
+          "default": true,
+          "markdownDescription": "Suggest Tailwind utilities when typing CSS declarations in class lists (Tailwind CSS v3 and v4). Typing a supported property name such as `width` or `width:40px` suggests the matching utility family. Uses `#tailwindCSS.rootFontSize#` for rem equivalents. Requires `#tailwindCSS.suggestions#`. Set to `false` to disable reverse lookup.",
           "scope": "language-overridable"
         },
         "tailwindCSS.experimental.classRegex": {

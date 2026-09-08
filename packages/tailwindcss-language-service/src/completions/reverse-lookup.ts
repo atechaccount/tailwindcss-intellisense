@@ -103,6 +103,39 @@ const LENGTH_UNIT =
   /^(?:px|rem|em|ex|ch|cap|ic|lh|rlh|cm|mm|q|in|pt|pc|[sld]?v[whib]|[sld]?vmin|[sld]?vmax|cq[whib]|cqmin|cqmax|%)$/i
 const MAX_RESULTS = 50
 
+const PROPERTY_KEYS = Object.keys(properties)
+
+function resolveProperty(prefix: string): string | null {
+  let lower = prefix.toLowerCase()
+  let matches = PROPERTY_KEYS.filter((property) => property.startsWith(lower))
+  return matches.length === 1 ? matches[0] : null
+}
+
+function withoutProjectPrefix(state: State, className: string): string {
+  let name = className.replace(/^-/, '')
+  let prefix = state.v4 ? '' : state.config?.prefix ?? ''
+  if (prefix && name.startsWith(prefix)) name = name.slice(prefix.length)
+  return name
+}
+
+// Property mode is only a fallback when the typed text is not also an ordinary
+// utility prefix. Without this check, typing `w` (or `w-`) would stop offering
+// normal `w-*` completion in favour of the reverse lookup family. The root
+// check handles the common short prefixes without scanning the whole class
+// list; the class-list check catches wider families such as `justify-c`.
+function conflictsWithUtilityPrefix(
+  state: State,
+  property: string,
+  propertyPrefix: string,
+): boolean {
+  if (properties[property].roots.some((root) => root.startsWith(propertyPrefix))) return true
+  if (!state.classList) return false
+  for (let [className] of state.classList) {
+    if (withoutProjectPrefix(state, className).startsWith(propertyPrefix)) return true
+  }
+  return false
+}
+
 interface Query {
   text: string
   property: string
@@ -130,14 +163,42 @@ const caches = new WeakMap<State, Cache>()
 
 function parseQuery(state: State, classList: string): Query | null {
   // Queries intentionally stay on one line and contain one scalar value. Do not
-  // swallow neighboring classes, arbitrary classes, or a CSS block.
+  // swallow neighboring classes, arbitrary classes, or a CSS block. Spaces are
+  // class separators, so only the colon form is a value query; a plain
+  // property name is handled as property mode below.
   let line = classList.slice(classList.lastIndexOf('\n') + 1)
-  let match = /(?:^|[\t ])(\S+?)(?:[\t ]*:[\t ]*|[\t ]+)([^\s:;{}[\]"'`\\!]*);?$/.exec(line)
-  if (!match) return null
+  let valueMatch = /(?:^|[\t ])(\S+?)(?:[\t ]*:[\t ]*)([^\s:;{}[\]"'`\\!]*);?$/.exec(line)
+  if (valueMatch) {
+    let parts = segment(valueMatch[1], state.separator)
+    let property = parts.pop().toLowerCase()
+    if (Object.hasOwn(properties, property)) {
+      let before = parts.length > 0 ? parts.join(state.separator) + state.separator : ''
+      if (!before || getVariantsFromClassName(state, before).offset === before.length) {
+        let prefix = state.v4 ? state.designSystem.theme.prefix : null
+        if (prefix && parts.includes(prefix)) {
+          if (parts[0] !== prefix) return null
+          parts.shift()
+        }
 
-  let parts = segment(match[1], state.separator)
-  let property = parts.pop().toLowerCase()
-  if (!Object.hasOwn(properties, property)) return null
+        let value = valueMatch[2]
+        if (properties[property].kind === 'length' && NUMBER.test(value)) value += 'px'
+        return { text: valueMatch[0].trimStart(), property, value, variants: parts }
+      }
+    }
+  }
+
+  // Property-prefix mode: `width` (or `wid`, `hover:width`, etc.) offers the
+  // matching utility family without requiring a colon or an intermediate
+  // `width:` completion. It is deliberately skipped for short/bare utility
+  // prefixes such as `w` or `w-`.
+  let prefixMatch = /(?:^|[\t ])(\S+)$/.exec(line)
+  if (!prefixMatch) return null
+
+  let parts = segment(prefixMatch[1], state.separator)
+  let propertyPrefix = parts.pop().toLowerCase()
+  if (!/^[a-z][a-z0-9-]*$/.test(propertyPrefix)) return null
+  let property = resolveProperty(propertyPrefix)
+  if (!property) return null
 
   let before = parts.length > 0 ? parts.join(state.separator) + state.separator : ''
   if (before && getVariantsFromClassName(state, before).offset !== before.length) return null
@@ -148,10 +209,9 @@ function parseQuery(state: State, classList: string): Query | null {
     parts.shift()
   }
 
-  let value = match[2]
-  if (properties[property].kind === 'length' && NUMBER.test(value)) value += 'px'
+  if (conflictsWithUtilityPrefix(state, property, propertyPrefix)) return null
 
-  return { text: match[0].trimStart(), property, value, variants: parts }
+  return { text: prefixMatch[1], property, value: '', variants: parts }
 }
 
 function withVariants(state: State, className: string, variants: string[] = []): string {

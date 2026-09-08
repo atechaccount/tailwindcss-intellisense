@@ -2,7 +2,7 @@
 
 ## Prerelease
 
-- Add opt-in CSS-to-Tailwind class suggestions with `tailwindCSS.experimental.reverseLookup` (Tailwind CSS v3 and v4).
+- Enable CSS-to-Tailwind reverse lookup by default with `tailwindCSS.experimental.reverseLookup` (Tailwind CSS v3 and v4). Typing a supported property name such as `width` directly suggests `w-*`, `width:40px` still matches `w-10`, and the feature can be disabled with `"tailwindCSS.experimental.reverseLookup": false`.
 
 ## 0.16.0
 

@@ -249,7 +249,7 @@ export function getDefaultTailwindSettings(): Settings {
         ],
       },
       experimental: {
-        reverseLookup: false,
+        reverseLookup: true,
         classRegex: [],
         configFile: null,
       },

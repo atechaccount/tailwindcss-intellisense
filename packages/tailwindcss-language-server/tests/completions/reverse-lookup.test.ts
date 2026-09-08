@@ -23,7 +23,7 @@ for (let version of [3, 4]) {
     // This exercises many documents plus live settings changes, which also
     // revalidate every open document in the real server.
     options: { timeout: 45000 },
-    name: `v${version}: reverse lookup is opt-in and uses the real Tailwind compiler`,
+    name: `v${version}: reverse lookup is enabled by default and uses the real Tailwind compiler`,
     fs:
       version === 3
         ? { 'tailwind.config.js': js`module.exports = { content: ['./**/*.html'] }` }
@@ -34,21 +34,18 @@ for (let version of [3, 4]) {
           },
     prepare: async ({ root }) => ({ client: await createClient({ root }) }),
     handle: async ({ client }) => {
-      let { doc, result: defaults } = await complete(client, '<div class="width:40px|">')
-      expect(defaults.isIncomplete).toBe(false)
-      expect(defaults.items.some((item) => item.filterText === 'width:40px')).toBe(false)
-
-      await client.updateSettings({ tailwindCSS: { experimental: { reverseLookup: true } } })
-      let enabled = await doc.completions({ line: 0, character: 22 })
+      let { doc, result: enabled } = await complete(client, '<div class="width:40px|">')
       expect(enabled.isIncomplete).toBe(true)
       expect(enabled.items.map((item) => item.label)).toEqual(['w-10'])
       expect(enabled.items[0].detail).toContain('40px')
 
+      await client.updateSettings({ tailwindCSS: { experimental: { reverseLookup: true } } })
       let examples = [
         ['width:40px', 'w-10'],
         ['width: 40px', 'w-10'],
-        ['width 40', 'w-10'],
         ['width:40', 'w-10'],
+        ['width', 'w-10'],
+        ['wid', 'w-10'],
         ['height:40px', 'h-10'],
         ['padding:16px', 'p-4'],
         ['margin:-16px', '-m-4'],
@@ -63,6 +60,7 @@ for (let version of [3, 4]) {
         ['width:41px', 'w-[41px]'],
         // text-base also sets line-height, so it is not an exact equivalent.
         ['font-size:16px', 'text-[16px]'],
+        ['hover:width', 'hover:w-10'],
         ['hover:width:40px', 'hover:w-10'],
         ['[&:focus]:width:40px', '[&:focus]:w-10'],
       ]
@@ -81,6 +79,10 @@ for (let version of [3, 4]) {
         expect(resolved.documentation, query).toMatchObject({ kind: 'markdown' })
       }
 
+      let whitespace = await complete(client, '<div class="flex width 40| p-4">')
+      expect(whitespace.result.isIncomplete).toBe(false)
+      expect(whitespace.result.items.some((item) => item.filterText === 'width 40')).toBe(false)
+
       let middle = await complete(client, '<div class="width:4|0px flex">')
       expect(middle.result.items.map((item) => item.label)).toEqual(['w-10'])
       expect(
@@ -96,7 +98,8 @@ for (let version of [3, 4]) {
       ).toEqual(['w-8'])
 
       await client.updateSettings({ tailwindCSS: { experimental: { reverseLookup: false } } })
-      expect(await doc.completions({ line: 0, character: 22 })).toEqual(defaults)
+      let disabled = await doc.completions({ line: 0, character: 22 })
+      expect(disabled.items.some((item) => item.filterText === 'width:40px')).toBe(false)
 
       await client.updateSettings({
         tailwindCSS: { experimental: { reverseLookup: true }, suggestions: false },

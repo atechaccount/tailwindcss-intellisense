@@ -96,18 +96,20 @@ function labels(state: State, text: string, rootFontSize = 16) {
 }
 
 describe('CSS reverse lookup', () => {
-  test.each([
-    'width:40px',
-    'width: 40px',
-    'width : 40px',
-    'width 40px',
-    'width 40',
-    'width:40',
-    'WIDTH:40px',
-    'width:40px;',
-  ])('recognizes %s', (text) => {
-    let { state } = project()
-    expect(labels(state, text)).toEqual(['w-10'])
+  test.each(['width:40px', 'width: 40px', 'width : 40px', 'width:40', 'WIDTH:40px', 'width:40px;'])(
+    'recognizes %s',
+    (text) => {
+      let { state } = project()
+      expect(labels(state, text)).toEqual(['w-10'])
+    },
+  )
+
+  test('does not treat whitespace as a CSS value separator', () => {
+    let { state, compile } = project()
+    expect(complete(state, 'width 40px')).toBeNull()
+    expect(complete(state, 'width 40')).toBeNull()
+    expect(complete(state, 'width 40px;')).toBeNull()
+    expect(compile).not.toHaveBeenCalled()
   })
 
   test('replaces the entire query, uses the query for filtering, and includes CSS details', () => {
@@ -129,6 +131,49 @@ describe('CSS reverse lookup', () => {
     })
   })
 
+  test('offers the utility family directly from an unambiguous property prefix', () => {
+    let { state } = project()
+    let widthClassNames = ['w-0', 'w-8', 'w-10', 'w-40', 'w-card', 'w-full', 'w-em']
+    expect(labels(state, 'wid')).toEqual(widthClassNames)
+    expect(labels(state, 'width')).toEqual(widthClassNames)
+    expect(complete(state, 'width').items[0].textEdit).toEqual({
+      range: { start: { line: 0, character: 12 }, end: { line: 0, character: 17 } },
+      newText: 'w-0',
+    })
+  })
+
+  test('property-prefix completion preserves variants and project prefixes', () => {
+    let { state } = project()
+    expect(labels(state, 'hover:width')).toContain('hover:w-10')
+    expect(complete(state, 'hover:width').items[0].textEdit).toEqual({
+      range: { start: { line: 0, character: 12 }, end: { line: 0, character: 23 } },
+      newText: 'hover:w-0',
+    })
+
+    state.designSystem.theme.prefix = 'tw'
+    state.variants.unshift({
+      name: 'tw',
+      values: [],
+      hasDash: false,
+      isArbitrary: false,
+      selectors: () => [],
+    })
+    state.classList = [...state.classList]
+    expect(labels(state, 'width')).toContain('tw:w-10')
+    expect(labels(state, 'hover:width')).toContain('tw:hover:w-10')
+    expect(labels(state, 'tw:hover:width')).toContain('tw:hover:w-10')
+    expect(complete(state, 'hover:tw:width')).toBeNull()
+    expect(complete(state, 'unknown:width')).toBeNull()
+  })
+
+  test('does not enter property mode for ordinary or bare utility input', () => {
+    let { state, compile } = project()
+    for (let text of ['w', 'w-', 'hover:w', 'hover:w-', '40px', '40', 'p', 'text', 'flex']) {
+      expect(complete(state, text), text).toBeNull()
+    }
+    expect(compile).not.toHaveBeenCalled()
+  })
+
   test('handles a query on a later line without editing previous classes', () => {
     let { state } = project()
     let result = provideReverseLookupCompletions(
@@ -148,7 +193,7 @@ describe('CSS reverse lookup', () => {
 
   test.each([
     ['padding:16px', 'p-4'],
-    ['margin -16', '-m-4'],
+    ['margin:-16px', '-m-4'],
     ['width:100%', 'w-full'],
     ['width:2.5em', 'w-em'],
     ['width:0', 'w-0'],
@@ -336,21 +381,21 @@ describe('CSS reverse lookup', () => {
 })
 
 describe('completion integration', () => {
-  test('defaults to off and performs no reverse-lookup compilation when disabled', () => {
-    expect(getDefaultTailwindSettings().tailwindCSS.experimental.reverseLookup).toBe(false)
+  test('defaults to on and can be disabled explicitly', () => {
+    expect(getDefaultTailwindSettings().tailwindCSS.experimental.reverseLookup).toBe(true)
     let { state, compile } = project()
     let range = { start: { line: 0, character: 12 }, end: { line: 0, character: 22 } }
-    let defaults = completionsFromClassList(state, 'width:40px', range, 16)
+    let enabled = completionsFromClassList(state, 'width:40px', range, 16)
+    expect(enabled.items.map((item) => item.label)).toEqual(['w-10'])
+    expect(enabled.items.every((item) => item.filterText === 'width:40px')).toBe(true)
+    expect(compile).toHaveBeenCalled()
+
+    compile.mockClear()
     let disabled = completionsFromClassList(state, 'width:40px', range, 16, undefined, undefined, {
       reverseLookup: false,
     })
-    expect(disabled).toEqual(defaults)
+    expect(disabled.items.some((item) => item.filterText === 'width:40px')).toBe(false)
     expect(compile).not.toHaveBeenCalled()
-    let enabled = completionsFromClassList(state, 'width:40px', range, 16, undefined, undefined, {
-      reverseLookup: true,
-    })
-    expect(enabled.items.map((item) => item.label)).toEqual(['w-10'])
-    expect(compile).toHaveBeenCalled()
   })
 
   test('respects the pixel-equivalent display setting without changing matching', () => {
@@ -476,6 +521,44 @@ describe('completion integration', () => {
       expect(TextDocument.applyEdits(file.doc, [result.items[0].textEdit as TextEdit])).toBe(output)
     },
   )
+
+  test('property-prefix completion replaces the prefix in class contexts', async () => {
+    let { state } = project()
+    let text = '<div class="wid| flex">'
+    let file = createDocument({
+      name: '/property-prefix-html',
+      lang: 'html',
+      content: text.replace('|', ''),
+    })
+    state.editor = file.state.editor
+    let result = await doComplete(state, file.doc, file.doc.positionAt(text.indexOf('|')))
+    expect(result.items.map((item) => item.label)).toContain('w-10')
+    let item = result.items.find((item) => item.label === 'w-10')!
+    expect(item.textEdit).toEqual({
+      range: {
+        start: file.doc.positionAt(text.indexOf('wid')),
+        end: file.doc.positionAt(text.indexOf('|')),
+      },
+      newText: 'w-10',
+    })
+    expect(TextDocument.applyEdits(file.doc, [item.textEdit as TextEdit])).toBe(
+      '<div class="w-10 flex">',
+    )
+  })
+
+  test('explicitly disabling the setting leaves reverse lookup off', async () => {
+    let { state } = project()
+    let text = '<div class="width:40px|">'
+    let file = createDocument({
+      name: '/reverse-lookup-disabled-html',
+      lang: 'html',
+      content: text.replace('|', ''),
+      settings: { tailwindCSS: { experimental: { reverseLookup: false } } },
+    })
+    state.editor = file.state.editor
+    let result = await doComplete(state, file.doc, file.doc.positionAt(text.indexOf('|')))
+    expect(result.items.some((item) => item.filterText === 'width:40px')).toBe(false)
+  })
 
   test('does not reverse-complete ordinary CSS declarations or inline styles', async () => {
     for (let [lang, text] of [

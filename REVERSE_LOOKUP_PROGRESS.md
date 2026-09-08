@@ -1,18 +1,22 @@
-# Opt-in CSS → Tailwind reverse lookup
+# CSS → Tailwind reverse lookup (enabled by default in this local build)
 
 ## Goal
 
-Help people learning Tailwind find a utility by typing a CSS declaration in a class
-completion context, for example `width:40px`, `width: 40px`, or `width 40`. Reverse
-lookup must be opt-in and must not change normal autocomplete when disabled.
+Help people learning Tailwind find a utility by typing a CSS property name or
+declaration in a class completion context, for example `width`, `wid`, or
+`width:40px`. Reverse lookup is enabled by default in this local build, but can
+be disabled with `tailwindCSS.experimental.reverseLookup: false`.
 
 ## Initial plan (2026-09-07)
 
 1. Add `tailwindCSS.experimental.reverseLookup` as a boolean setting, defaulting
-   to `false`, in the VS Code settings UI and language-service configuration.
+   to `true` in this local build, in the VS Code settings UI and language-service
+   configuration.
 2. Recognize a single CSS property/value query in existing class completion
-   contexts. For supported length properties, explicitly interpret bare numbers
-   as pixels. Replace the whole query when a suggestion is accepted, leaving
+   contexts. Also recognize an unambiguous property prefix such as `width` or
+   `wid` and offer the matching utility family directly, without requiring a
+   colon. For supported length properties, explicitly interpret bare numbers as
+   pixels. Replace the whole query when a suggestion is accepted, leaving
    surrounding classes and valid variants intact.
 3. Match common properties against the active project's generated utilities,
    respecting its theme, prefix, blocklist, and configured root font size. Prefer
@@ -28,13 +32,19 @@ lookup must be opt-in and must not change normal autocomplete when disabled.
 
 ## Completed
 
-- Added the off-by-default setting to the VS Code manifest, typed configuration,
+- Added the default-on setting to the VS Code manifest, typed configuration,
   and language-service defaults. It supports User, Workspace, and language-specific
   settings. The existing `tailwindCSS.suggestions` switch remains authoritative.
 - Added reverse completion for common dimensions, spacing, offsets, gaps, border
-  radius, typography, colors, opacity, and layout keywords. Supports colon or
-  space separators, optional whitespace, and bare pixel lengths. Unitless CSS
-  properties keep their usual meaning.
+  radius, typography, colors, opacity, and layout keywords. Supports colon
+  separators, optional whitespace after the colon, and bare pixel lengths.
+  Unitless CSS properties keep their usual meaning. Whitespace-only syntax such
+  as `width 40px` is deliberately not supported because spaces separate classes.
+- Added property-prefix mode (`width`, `wid`, `hover:width`) that offers the
+  matching utility family directly and replaces the typed property prefix when a
+  suggestion is accepted. Short/standard utility prefixes such as `w-`, `flex`,
+  and `text-` remain in normal Tailwind completion. Bare values such as `40px`
+  are not treated as reverse lookups.
 - Added property browsing (`width:`), partial keyword searches (`display:fl`),
   named matches, and compiler-checked arbitrary-value fallbacks. Numeric searches
   do not guess the nearest spacing step. Results include CSS details and reuse
@@ -70,7 +80,7 @@ installed in the environment.
 | --------------------------------------------------------------------------- | ---------------------------------------------------- |
 | `pnpm install --frozen-lockfile`                                            | Passed; see optional dependency warning below        |
 | Language-server fixture setup: `node tests/prepare.mjs`                     | Passed                                               |
-| Language-service suite: `vitest run --silent`                               | **811 passed** across 7 files                        |
+| Language-service suite: `vitest run --silent`                               | **815 passed** across 7 files                        |
 | Language-server suite: `vitest run --maxWorkers=2 --silent`                 | **300 passed, 2 pre-existing skips** across 29 files |
 | Language-syntax suite: `vitest run --silent`                                | **15 passed**                                        |
 | Language-service `tsc --noEmit`                                             | Passed                                               |
@@ -81,7 +91,7 @@ installed in the environment.
 | Prettier on changed TypeScript/configuration files and this progress record | Passed                                               |
 | `git diff --check`                                                          | Passed                                               |
 
-**Total: 1,126 tests passed; 2 existing tests skipped.** Build output and temporary
+**Total: 1,130 tests passed; 2 existing tests skipped.** Build output and temporary
 fixtures/logs are not part of the commit. Existing unrelated README formatting
 was preserved rather than reformatted wholesale.
 
@@ -119,19 +129,20 @@ still succeeded, and none of the executed tests or builds required that binary.
 - Results are capped at 50; typing a more specific value narrows the search.
 - No marketplace release, VSIX packaging, push, or pull request was requested or
   performed. The code and this document are delivered together in a local commit
-  on `arena/01a07df1-tailwindcss-intellisense`.
+  on `arena/01a07e8f-tailwindcss-intellisense`.
 
-## Enable the feature
+## Use the feature
 
-In VS Code Settings, search for **Tailwind CSS Experimental Reverse Lookup** and
-check it, or set the following in User or Workspace settings:
+Reverse lookup is enabled by default in this local build. To disable it
+explicitly, set the following in User or Workspace settings:
 
 ```json
 {
-  "tailwindCSS.experimental.reverseLookup": true
+  "tailwindCSS.experimental.reverseLookup": false
 }
 ```
 
-With the default theme and a 16px root font size, typing `width:40px` or `width 40`
-in a class list suggests `w-10`. Accept the suggestion to replace the query.
-The setting is **not enabled automatically** by this change.
+With the default theme and a 16px root font size, typing `width` or `wid` in a
+class list suggests the `w-*` family (including `w-10`), and typing `width:40px`
+suggests `w-10`. Accept the suggestion to replace the property prefix or
+declaration. Whitespace syntax such as `width 40` is not supported.

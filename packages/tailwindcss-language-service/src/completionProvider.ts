@@ -69,7 +69,10 @@ export function completionsFromClassList(
     document?: TextDocument
   } = {},
 ): CompletionList {
-  if (options.reverseLookup === true) {
+  // Reverse lookup is enabled by default in this local build. The setting can
+  // still turn it off explicitly: `"tailwindCSS.experimental.reverseLookup": false`.
+  let reverseLookupEnabled = options.reverseLookup ?? true
+  if (reverseLookupEnabled) {
     let result = provideReverseLookupCompletions(
       state,
       classList,
