@@ -18,6 +18,8 @@ In order for the extension to activate you must have [`tailwindcss` installed](h
 
 Intelligent suggestions for class names, as well as [CSS functions and directives](https://tailwindcss.com/docs/functions-and-directives/).
 
+[Reverse lookup](#tailwindcssexperimentalreverselookup) is enabled by default and lets you search for Tailwind classes using CSS property names or declarations such as `width` and `width:40px`.
+
 <img src="https://raw.githubusercontent.com/tailwindlabs/tailwindcss-intellisense/main/packages/vscode-tailwindcss/.github/autocomplete.png" alt="" />
 
 ### Linting
@@ -205,6 +207,41 @@ Enable the Node.js inspector agent for the language server and listen on the spe
 ## Experimental Extension Settings
 
 **_Experimental settings may be changed or removed at any time._**
+
+### `tailwindCSS.experimental.reverseLookup`
+
+Suggest Tailwind utilities by typing CSS instead of remembering class names. **Default: `true`** in this local build. Requires Tailwind CSS v3 or v4 and `tailwindCSS.suggestions` to be enabled.
+
+To disable it explicitly, set:
+
+```json
+{
+  "tailwindCSS.experimental.reverseLookup": false
+}
+```
+
+Start typing a supported CSS property name in a class list and reverse lookup offers the matching utility family directly. For example, typing `width` or `wid` suggests `w-0`, `w-px`, `w-1`, `w-10`, `w-full`, and any project-specific width utilities. Accepting a suggestion replaces the typed property prefix (selecting `w-10` replaces `width` with `w-10`). If the suggestion menu does not appear automatically, run VS Code's **Trigger Suggest** command (see also the recommended `editor.quickSuggestions` setting above):
+
+| Query                          | Suggested class (default theme)         |
+| ------------------------------ | --------------------------------------- |
+| `width` or `wid`               | `w-*` utilities, including `w-10`       |
+| `width:`                       | Bounded list of `w-*` utilities         |
+| `width:40px`, `width: 40px`    | `w-10`                                  |
+| `padding:16px`                 | `p-4`                                   |
+| `display:flex`                 | `flex`                                  |
+| `hover:width`                  | `hover:w-*` utilities, including `hover:w-10` |
+| `hover:width:40px`             | `hover:w-10`                            |
+| `width:41px`                   | `w-[41px]` when there is no named match |
+
+Colon-based syntax remains available for precise searches: `width:` browses up to 50 width utilities, and `width:40px` or `width:40` filters to the equivalent class such as `w-10`. Bare numbers after a colon are interpreted as pixels (`width:40` means 40px, while `w-40` normally means 160px). Pixel/rem matching uses `tailwindCSS.rootFontSize` (16 by default); the examples above assume that default. Unitless properties such as `opacity` and `line-height` retain their normal CSS meaning.
+
+Spaces are class separators, so whitespace syntax such as `width 40px` is intentionally not supported. Bare values such as `40px` are also not treated as reverse lookups because the intended property is ambiguous. Ordinary Tailwind completion for short or standard utility prefixes such as `w-`, `flex`, or `text-` is unchanged.
+
+Suggestions show the equivalent CSS and use your project's theme, prefix, and blocklist. Named matches are preferred; for supported values without a named match, the extension tries an arbitrary-value utility. Existing CSS previews are available in the suggestion details.
+
+Reverse lookup works in configured class attributes (`class`, `className`, etc.), class functions and tagged templates, custom `classRegex` matches, and `@apply` lists. Ordinary class and variant completions remain unchanged. No reverse-lookup compilation or index building runs while the setting is disabled.
+
+The initial scope is **single, same-line CSS property names or declarations** for common properties: dimensions, physical margin/padding and offsets, gaps, border radius, basic typography, colors, opacity, and common layout keywords. Keywords can be completed from a prefix such as `display:fl`; numeric values match exactly rather than approximately. Multi-value shorthands, whole CSS blocks, inline `style` conversion, Emmet queries, and arbitrary plugin class names outside the supported utility families are not covered. Utilities that set additional CSS properties are not treated as exact matches (for example, `text-base` also sets `line-height`). Not every CSS property or value has a supported match.
 
 ### `tailwindCSS.experimental.configFile`
 

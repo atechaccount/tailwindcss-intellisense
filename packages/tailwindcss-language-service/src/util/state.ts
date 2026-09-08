@@ -71,6 +71,7 @@ export type TailwindCssSettings = {
     suggestCanonicalClasses: DiagnosticSeveritySetting
   }
   experimental: {
+    reverseLookup: boolean
     classRegex: string[] | [string, string][]
     configFile: string | Record<string, string | string[]> | null
   }
@@ -248,6 +249,7 @@ export function getDefaultTailwindSettings(): Settings {
         ],
       },
       experimental: {
+        reverseLookup: true,
         classRegex: [],
         configFile: null,
       },

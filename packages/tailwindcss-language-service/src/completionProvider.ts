@@ -41,6 +41,7 @@ import { customClassesIn } from './util/classes'
 import { IS_SCRIPT_SOURCE, IS_TEMPLATE_SOURCE } from './metadata/extensions'
 import * as postcss from 'postcss'
 import { findFileDirective } from './completions/file-paths'
+import { provideReverseLookupCompletions } from './completions/reverse-lookup'
 import type { ThemeEntry } from './util/v4'
 import { segment } from './util/segment'
 import { resolveKnownThemeKeys, resolveKnownThemeNamespaces } from './util/v4/theme-keys'
@@ -62,7 +63,30 @@ export function completionsFromClassList(
   rootFontSize: number,
   filter?: (item: CompletionItem) => boolean,
   context?: CompletionContext,
+  options: {
+    reverseLookup?: boolean
+    showPixelEquivalents?: boolean
+    document?: TextDocument
+  } = {},
 ): CompletionList {
+  // Reverse lookup is enabled by default in this local build. The setting can
+  // still turn it off explicitly: `"tailwindCSS.experimental.reverseLookup": false`.
+  let reverseLookupEnabled = options.reverseLookup ?? true
+  if (reverseLookupEnabled) {
+    let result = provideReverseLookupCompletions(
+      state,
+      classList,
+      classListRange,
+      rootFontSize,
+      options.showPixelEquivalents,
+      options.document,
+    )
+    if (result) {
+      if (filter) result.items = result.items.filter(filter)
+      return result
+    }
+  }
+
   let classNames = classList.split(/[\s+]/)
   const partialClassName = classNames[classNames.length - 1]
   let sep = state.separator
@@ -796,6 +820,11 @@ async function provideClassAttributeCompletions(
         settings.rootFontSize,
         undefined,
         context,
+        {
+          reverseLookup: settings.experimental.reverseLookup,
+          showPixelEquivalents: settings.showPixelEquivalents,
+          document,
+        },
       )
     }
   } catch (_) {}
@@ -835,6 +864,11 @@ async function provideCustomClassNameCompletions(
       settings.tailwindCSS.rootFontSize,
       undefined,
       context,
+      {
+        reverseLookup: settings.tailwindCSS.experimental.reverseLookup,
+        showPixelEquivalents: settings.tailwindCSS.showPixelEquivalents,
+        document,
+      },
     )
   }
 
@@ -985,6 +1019,11 @@ async function provideAtApplyCompletions(
       return validated !== null && validated.isApplyable === true
     },
     context,
+    {
+      reverseLookup: settings.experimental.reverseLookup,
+      showPixelEquivalents: settings.showPixelEquivalents,
+      document,
+    },
   )
 }
 
